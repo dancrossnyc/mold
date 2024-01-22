@@ -1,0 +1,63 @@
+# How to....
+
+To build on illumos, install the prerequisites mentioned
+in the README and then run:
+
+```
+rm -fr build
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DBLAKE3_USE_AMD64_ASM=1 ..
+cmake --build .
+```
+
+This will produce a `mold` binary.  Now use James MacMahon's
+wrapper to allow it to work with the illumos Rust build
+infrastructure: https://github.com/jmpesp/mold_shim
+
+Edit `mold_shim/src/main.rs` and change the path to `mold`
+to wherever it is on your system.  How, you should be able
+to build `mold_shim`: `cargo build --release`
+
+To compile and use `mold` with Cargo, simply set `LD_ALTEXEC`
+to point to `mold_shim`.  E.g.:
+
+```
+LD_ALTEXEC=/path/to/mold_shim cargo nextest run
+```
+
+# Why?
+
+Speed.  Mold is significantly faster than the illumos linker.
+When building something like Omicron, this becomes significant.
+On my build machine (a System 76 Thelio):
+
+With the system linker:
+
+```
+    Finished dev [unoptimized + debuginfo] target(s) in 6m 53s
+```
+
+With mold:
+
+```
+    Finished dev [unoptimized + debuginfo] target(s) in 4m 51s
+```
+
+If I capture just the link step to compare, with the system ld:
+
+```
+sh slow-link.sh  127.91s user 4.06s system 99% cpu 2:12.57 total
+```
+
+Now with `mold`:
+
+```
+LD_ALTEXEC=/home/cross/ports/mold_shim/target/release/mold_shim sh   0.04s user 0.02s system 6% cpu 0.792 total
+```
+
+# Credits
+
+Should be given where it is due.  Luqman Aden floated the
+original "shn_index with value = 0" patch for illumos.
+James MacMahon wrote the `mold_shim` wrapper.
